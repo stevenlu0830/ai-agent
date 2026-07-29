@@ -1,5 +1,5 @@
 # ai-searcher
 
-This is an AI Searcher that help you search something and generates a report
+This is an AI Agent that respond your prompt.
 
 Technology used: Python
