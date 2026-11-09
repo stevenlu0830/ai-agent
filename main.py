@@ -1,11 +1,12 @@
+import os
+
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
 from tools import search_tool, wiki_tool, save_tool
 
 load_dotenv()
@@ -17,8 +18,9 @@ class ResearchResponse(BaseModel):
     sources: list[str]
     tools_used: list[str]
 
-# llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
-llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
+# Groq has a free tier. Reads GROQ_API_KEY from .env; set GROQ_MODEL to switch models
+# (see https://console.groq.com/docs/models for the current list).
+llm = ChatGroq(model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"), temperature=0.7)
 
 # Create a prompt template for the LLM that takes the output of LLM and
 # parses it into the ResearchResponse model
@@ -56,7 +58,8 @@ raw_response = agent_executor.invoke({"query": query})
 
 # Parse the raw response into the structured format using the PydanticOutputParser
 try:
-    structured_response = parser.parse(raw_response["output"][0]["text"])
+    # Groq returns the final answer as a plain string (Anthropic returned a list of blocks)
+    structured_response = parser.parse(raw_response["output"])
     print(structured_response)
 except Exception as e:
     print("Error parsing response", e, "Raw response - ", raw_response)
