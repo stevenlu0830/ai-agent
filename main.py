@@ -11,6 +11,12 @@ from tools import search_tool, wiki_tool, save_tool
 
 load_dotenv()
 
+if not os.getenv("GROQ_API_KEY"):
+    raise SystemExit(
+        'GROQ_API_KEY is empty. Get a free key at https://console.groq.com/keys '
+        'and put it in .env as GROQ_API_KEY="gsk_..."'
+    )
+
 # Specify all of the fields that you want as output from your LLM call
 class ResearchResponse(BaseModel):
     topic: str
