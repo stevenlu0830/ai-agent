@@ -1,5 +1,7 @@
-from langchain_community.tools import WikipediaQueryRun, DuckDuckGoSearchRun
-from langchain_community.utilities import WikipediaAPIWrapper
+import time
+
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper, DuckDuckGoSearchAPIWrapper
 from langchain_core.tools import Tool
 from datetime import datetime
 
@@ -21,10 +23,25 @@ save_tool = Tool(
 )
 
 # Wikipedia tool for querying information
-search = DuckDuckGoSearchRun()
+# The default region "wt-wt" makes ddgs query a Wikipedia site that doesn't exist, so set one.
+search = DuckDuckGoSearchAPIWrapper(region="us-en")
+
+# The free search and Wikipedia APIs sometimes fail or come back empty, so retry a few
+# times and return a message instead of raising, which would stop the whole agent.
+def run_with_retries(func, query: str, failure_message: str, attempts: int = 3) -> str:
+    for attempt in range(attempts):
+        try:
+            return func(query)
+        except Exception:
+            if attempt < attempts - 1:
+                time.sleep(2)
+    return failure_message
+
 search_tool = Tool(
     name="search",
-    func=search.run,
+    func=lambda query: run_with_retries(
+        search.run, query, "Web search failed. Try the wikipedia tool instead."
+    ),
     description="Search the web for information",
 )
 
@@ -32,4 +49,11 @@ search_tool = Tool(
 api_wrapper = WikipediaAPIWrapper(top_k_results=1, doc_content_chars_max=100)
 
 # Wikipedia tool for querying information using the API wrapper
-wiki_tool = WikipediaQueryRun(api_wrapper=api_wrapper)
+wiki = WikipediaQueryRun(api_wrapper=api_wrapper)
+wiki_tool = Tool(
+    name=wiki.name,
+    func=lambda query: run_with_retries(
+        wiki.run, query, "Wikipedia lookup failed. Try the search tool instead."
+    ),
+    description=wiki.description,
+)
