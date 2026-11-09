@@ -8,7 +8,10 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
-from tools import search_tool, wiki_tool, save_tool
+from tools import search_tool, wiki_tool, save_tool, save_to_txt
+
+# Every run appends the query and the LLM's response to this file (created if missing)
+OUTPUT_FILE = "research_output.txt"
 
 load_dotenv()
 
@@ -77,9 +80,22 @@ query = input("Enter your research query: ")
 raw_response = agent_executor.invoke({"query": query})
 
 # Parse the raw response into the structured format using the PydanticOutputParser
+# OpenRouter and Groq return the final answer as a plain string
+output_text = raw_response["output"]
 try:
-    # OpenRouter and Groq return the final answer as a plain string
-    structured_response = parser.parse(raw_response["output"])
+    structured_response = parser.parse(output_text)
     print(structured_response)
+    report = (
+        f"Query: {query}\n"
+        f"Topic: {structured_response.topic}\n"
+        f"Summary: {structured_response.summary}\n"
+        "Sources:\n"
+        + "".join(f"- {source}\n" for source in structured_response.sources)
+        + f"Tools used: {', '.join(structured_response.tools_used)}"
+    )
 except Exception as e:
     print("Error parsing response", e, "Raw response - ", raw_response)
+    # Still save what the LLM said, even if it didn't match the expected format
+    report = f"Query: {query}\n(Response was not in the expected format)\n{output_text}"
+
+print(save_to_txt(report, filename=OUTPUT_FILE))
