@@ -64,7 +64,7 @@ python main.py
 Type your question when prompted:
 
 ```
-Enter your research query: What does a human cell consist of?
+Enter your research query: 
 ```
 
 The agent prints each tool it uses, then the final report. Each run's question and report are added to the end of `research_output.txt`, which is created automatically. Git ignores this file.
