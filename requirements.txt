@@ -3,6 +3,7 @@ langchain-classic
 wikipedia
 langchain-community
 langchain-groq
+langchain-openai
 python-dotenv
 pydantic
 ddgs

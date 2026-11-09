@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
@@ -11,10 +12,25 @@ from tools import search_tool, wiki_tool, save_tool
 
 load_dotenv()
 
-if not os.getenv("GROQ_API_KEY"):
+
+# Uses whichever free provider has a key in .env (OpenRouter first, then Groq).
+def make_llm():
+    if os.getenv("OPENROUTER_API_KEY"):
+        # "openrouter/free" routes each call to a free model that supports tool calling.
+        # Free limits: 20 requests/min, 50/day (1,000/day after buying $10 of credits).
+        return ChatOpenAI(
+            model=os.getenv("OPENROUTER_MODEL", "openrouter/free"),
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            temperature=0.7,
+        )
+    if os.getenv("GROQ_API_KEY"):
+        # See https://console.groq.com/docs/models for current model names.
+        return ChatGroq(model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"), temperature=0.7)
     raise SystemExit(
-        'GROQ_API_KEY is empty. Get a free key at https://console.groq.com/keys '
-        'and put it in .env as GROQ_API_KEY="gsk_..."'
+        "No API key found. Add one of these to .env:\n"
+        '  OPENROUTER_API_KEY="sk-or-..."  (free key: https://openrouter.ai/keys)\n'
+        '  GROQ_API_KEY="gsk_..."          (free key: https://console.groq.com/keys)'
     )
 
 # Specify all of the fields that you want as output from your LLM call
@@ -24,9 +40,7 @@ class ResearchResponse(BaseModel):
     sources: list[str]
     tools_used: list[str]
 
-# Groq has a free tier. Reads GROQ_API_KEY from .env; set GROQ_MODEL to switch models
-# (see https://console.groq.com/docs/models for the current list).
-llm = ChatGroq(model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"), temperature=0.7)
+llm = make_llm()
 
 # Create a prompt template for the LLM that takes the output of LLM and
 # parses it into the ResearchResponse model
@@ -64,7 +78,7 @@ raw_response = agent_executor.invoke({"query": query})
 
 # Parse the raw response into the structured format using the PydanticOutputParser
 try:
-    # Groq returns the final answer as a plain string (Anthropic returned a list of blocks)
+    # OpenRouter and Groq return the final answer as a plain string
     structured_response = parser.parse(raw_response["output"])
     print(structured_response)
 except Exception as e:
